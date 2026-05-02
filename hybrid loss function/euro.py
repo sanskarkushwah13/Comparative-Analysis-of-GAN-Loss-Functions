@@ -1,10 +1,10 @@
 """
-cifar10_dcgan_hybrid.py
+eurosat_dcgan_hybrid.py
 =======================
-DCGAN for CIFAR-10 dataset with HYBRID loss only.
+DCGAN for EuroSAT dataset with HYBRID loss only.
   • Hybrid loss: WGAN-GP + L1 pixel + VGG feature matching
   • FID scoring, checkpointing, best-model saving, CSV results
-  • 100 Epochs
+  • 150 Epochs (matches paper's EuroSAT training duration)
 """
 
 import os
@@ -16,28 +16,31 @@ import torchvision
 import torchvision.transforms as transforms
 import torchvision.models as tvm
 from torchvision.utils import save_image, make_grid
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Dataset
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy import linalg
+from PIL import Image
+import glob
 
 # ──────────────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ──────────────────────────────────────────────────────────────────────────────
-
-DATA_ROOT   = os.path.expanduser("~/dataset/euro")
-IMG_SIZE    = 32
+DATA_ROOT   = os.path.expanduser("~/dataset/eurosat/EuroSAT_RGB")
+# DATA_ROOT   = os.path.expanduser("~/dataset/euro")   # EuroSAT root folder
+IMG_SIZE    = 64                                       # EuroSAT is 64×64
 Z_DIM       = 100
 NGF         = 64
 NDF         = 64
-BATCH_SIZE  = 128
+BATCH_SIZE  = 64                                       # smaller than CIFAR-10
 NUM_WORKERS = 2
 NUM_CLASSES = 10
 
-CIFAR10_CLASSES = [
-    "airplane", "automobile", "bird", "cat", "deer",
-    "dog", "frog", "horse", "ship", "truck"
+EUROSAT_CLASSES = [
+    "AnnualCrop", "Forest", "HerbaceousVegetation", "Highway",
+    "Industrial", "Pasture", "PermanentCrop", "Residential",
+    "River", "SeaLake"
 ]
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -45,24 +48,81 @@ print(f"Using device: {device}")
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# DATASET
+# DATASET  — EuroSAT folder structure:
+#   DATA_ROOT/
+#     AnnualCrop/  Forest/  Highway/  ... (10 class folders)
+#     each folder: 2000–3000 jpg/png files
 # ──────────────────────────────────────────────────────────────────────────────
 
-def get_dataloader(split="train", batch_size=BATCH_SIZE):
+class EuroSATDataset(Dataset):
+    """
+    Loads EuroSAT from a flat directory of class sub-folders.
+    Supports both .jpg and .png files.
+    """
+    def __init__(self, root, transform=None):
+        self.transform = transform
+        self.samples   = []
+        self.labels    = []
+
+        class_dirs = sorted([
+            d for d in os.listdir(root)
+            if os.path.isdir(os.path.join(root, d))
+        ])
+
+        if len(class_dirs) == 0:
+            raise RuntimeError(
+                f"No class sub-folders found in {root}.\n"
+                f"Expected structure:\n"
+                f"  {root}/AnnualCrop/*.jpg\n"
+                f"  {root}/Forest/*.jpg  ... etc."
+            )
+
+        print(f"  Found {len(class_dirs)} class folders: {class_dirs}")
+
+        for label, cls in enumerate(class_dirs):
+            cls_dir = os.path.join(root, cls)
+            files   = (
+                glob.glob(os.path.join(cls_dir, "*.jpg")) +
+                glob.glob(os.path.join(cls_dir, "*.jpeg")) +
+                glob.glob(os.path.join(cls_dir, "*.png")) +
+                glob.glob(os.path.join(cls_dir, "*.tif"))
+            )
+            if len(files) == 0:
+                print(f"  ⚠️  No images found in {cls_dir}")
+                continue
+            self.samples.extend(files)
+            self.labels.extend([label] * len(files))
+            print(f"    {cls:30s}: {len(files):5d} images")
+
+        print(f"  Total EuroSAT images: {len(self.samples)}")
+
+    def __len__(self):
+        return len(self.samples)
+
+    def __getitem__(self, idx):
+        img = Image.open(self.samples[idx]).convert("RGB")
+        if self.transform:
+            img = self.transform(img)
+        return img, self.labels[idx]
+
+
+def get_dataloader(batch_size=BATCH_SIZE):
     transform = transforms.Compose([
         transforms.Resize((IMG_SIZE, IMG_SIZE)),
+        transforms.RandomHorizontalFlip(),          # light augmentation for satellite
+        transforms.RandomVerticalFlip(),            # satellite images have no canonical orientation
         transforms.ToTensor(),
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     ])
-    is_train = (split == "train")
-    dataset  = torchvision.datasets.CIFAR10(
-        root=DATA_ROOT, train=is_train,
-        download=True, transform=transform
+    dataset = EuroSATDataset(root=DATA_ROOT, transform=transform)
+    return DataLoader(
+        dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=NUM_WORKERS,
+        drop_last=True,
+        pin_memory=True
     )
-    print(f"  CIFAR-10 {split}: {len(dataset)} images")
-    return DataLoader(dataset, batch_size=batch_size,
-                      shuffle=is_train, num_workers=NUM_WORKERS,
-                      drop_last=True, pin_memory=True)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -79,11 +139,12 @@ def weights_init(m):
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# GENERATOR  (z → 3×32×32 for CIFAR-10)
+# GENERATOR  (z → 3×64×64 for EuroSAT)
+# Note: one extra upsampling block compared to CIFAR-10 (32→64 needs 4 blocks)
 # ──────────────────────────────────────────────────────────────────────────────
 
 class Generator(nn.Module):
-    """z(100,1,1) → 512×4 → 256×8 → 128×16 → 3×32"""
+    """z(100,1,1) → 512×4 → 256×8 → 128×16 → 64×32 → 3×64"""
     def __init__(self, z_dim=Z_DIM, ngf=NGF):
         super().__init__()
         self.net = nn.Sequential(
@@ -99,8 +160,12 @@ class Generator(nn.Module):
             nn.ConvTranspose2d(ngf * 4, ngf * 2, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ngf * 2), nn.ReLU(True),
 
-            # 128×16×16 → 3×32×32
-            nn.ConvTranspose2d(ngf * 2, 3, 4, 2, 1, bias=False),
+            # 128×16×16 → 64×32×32
+            nn.ConvTranspose2d(ngf * 2, ngf, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(ngf), nn.ReLU(True),
+
+            # 64×32×32 → 3×64×64
+            nn.ConvTranspose2d(ngf, 3, 4, 2, 1, bias=False),
             nn.Tanh()
         )
         self.apply(weights_init)
@@ -110,30 +175,35 @@ class Generator(nn.Module):
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# DISCRIMINATOR  (3×32×32 → adv score)
+# DISCRIMINATOR  (3×64×64 → adv score)
 # ──────────────────────────────────────────────────────────────────────────────
 
 class Discriminator(nn.Module):
-    """3×32×32 → 64×16 → 128×8 → 256×4 → 1"""
+    """3×64×64 → 64×32 → 128×16 → 256×8 → 512×4 → 1"""
     def __init__(self, ndf=NDF):
         super().__init__()
         self.backbone = nn.Sequential(
-            # 3×32×32 → 64×16×16
+            # 3×64×64 → 64×32×32
             nn.Conv2d(3, ndf, 4, 2, 1, bias=False),
             nn.LeakyReLU(0.2, inplace=True),
 
-            # 64×16×16 → 128×8×8
+            # 64×32×32 → 128×16×16
             nn.Conv2d(ndf, ndf * 2, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ndf * 2),
             nn.LeakyReLU(0.2, inplace=True),
 
-            # 128×8×8 → 256×4×4
+            # 128×16×16 → 256×8×8
             nn.Conv2d(ndf * 2, ndf * 4, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ndf * 4),
             nn.LeakyReLU(0.2, inplace=True),
+
+            # 256×8×8 → 512×4×4
+            nn.Conv2d(ndf * 4, ndf * 8, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(ndf * 8),
+            nn.LeakyReLU(0.2, inplace=True),
         )
-        # 256×4×4 → 1×1×1
-        self.adv_head = nn.Conv2d(ndf * 4, 1, 4, 1, 0, bias=False)
+        # 512×4×4 → 1×1×1
+        self.adv_head = nn.Conv2d(ndf * 8, 1, 4, 1, 0, bias=False)
         self.apply(weights_init)
 
     def forward(self, x):
@@ -170,7 +240,8 @@ class VGGFeatureExtractor(nn.Module):
             p.requires_grad_(False)
 
     def forward(self, x):
-        x = F.interpolate(x, size=(64, 64),
+        # EuroSAT is already 64×64, upsample to 224 for VGG
+        x = F.interpolate(x, size=(224, 224),
                           mode='bilinear', align_corners=False)
         x = (x + 1.0) / 2.0   # [-1,1] → [0,1]
         return self.features(x)
@@ -318,28 +389,48 @@ class BestSaver:
         self.folder = os.path.join(out_dir, "models", "best")
         os.makedirs(self.folder, exist_ok=True)
 
-    def update(self, G, D, g_loss, epoch):
-        if g_loss < self.best:
-            self.best = g_loss
+    def update(self, G, D, fid, epoch):
+        # Save best by FID (lower = better) instead of G loss
+        if fid is not None and fid < self.best:
+            self.best = fid
             torch.save(G.state_dict(),
                        os.path.join(self.folder, "hybrid_G_best.pth"))
             torch.save(D.state_dict(),
                        os.path.join(self.folder, "hybrid_D_best.pth"))
-            print(f"  🏆 Best epoch {epoch+1} | G: {g_loss:.4f}")
+            print(f"  🏆 Best FID {fid:.4f} at epoch {epoch+1}")
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# IBFV — Intra-Batch Feature Variance (paper's mode diversity metric)
+# ──────────────────────────────────────────────────────────────────────────────
+
+def compute_ibfv(D, fake):
+    """
+    IBFV = (1/N) * sum_i || phi(x_i) - phi_mean ||^2
+    where phi = penultimate discriminator features (512×4×4 flattened)
+    """
+    D.eval()
+    with torch.no_grad():
+        feats = D.backbone(fake)                      # (N, 512, 4, 4)
+        feats = feats.view(feats.size(0), -1)         # (N, 8192)
+        mean  = feats.mean(dim=0, keepdim=True)
+        ibfv  = ((feats - mean) ** 2).sum(dim=1).mean().item()
+    D.train()
+    return ibfv
 
 
 # ──────────────────────────────────────────────────────────────────────────────
 # TRAINING LOOP
 # ──────────────────────────────────────────────────────────────────────────────
 
-def train(out_dir, epochs=100, inception=None, fid_every=10):
+def train(out_dir, epochs=150, inception=None, fid_every=10):
 
     print(f"\n{'='*62}")
-    print(f"  DCGAN + CIFAR-10 | HYBRID LOSS | {epochs} Epochs")
+    print(f"  DCGAN + EuroSAT | HYBRID LOSS | {epochs} Epochs")
     print(f"  Device: {device}")
     print(f"{'='*62}")
 
-    loader = get_dataloader("train", BATCH_SIZE)
+    loader = get_dataloader(BATCH_SIZE)
 
     G = Generator(z_dim=Z_DIM, ngf=NGF).to(device)
     D = Discriminator(ndf=NDF).to(device)
@@ -347,20 +438,22 @@ def train(out_dir, epochs=100, inception=None, fid_every=10):
     print(f"  G params : {sum(p.numel() for p in G.parameters()):,}")
     print(f"  D params : {sum(p.numel() for p in D.parameters()):,}")
 
-    # TTUR: slower G, faster D — standard for WGAN-GP
+    # TTUR: standard for WGAN-GP
     opt_g    = optim.Adam(G.parameters(), lr=0.0001, betas=(0.0, 0.9))
     opt_d    = optim.Adam(D.parameters(), lr=0.0004, betas=(0.0, 0.9))
     n_critic = 5
     print("  Adam TTUR | lr_G=0.0001 | lr_D=0.0004 | n_critic=5")
 
     g_losses, d_losses = [], []
+    ibfv_log           = []
+    mode_var_log       = []
     fid_scores         = {}
     best_saver         = BestSaver(out_dir)
 
     for epoch in range(epochs):
         epoch_g, epoch_d = [], []
 
-        for real, _ in loader:          # CIFAR-10: labels unused for GAN
+        for real, _ in loader:
             real  = real.to(device)
             batch = real.size(0)
 
@@ -389,48 +482,74 @@ def train(out_dir, epochs=100, inception=None, fid_every=10):
         g_losses.append(avg_g)
         d_losses.append(avg_d)
 
+        # Mode variance (pixel-space)
+        with torch.no_grad():
+            sample_z    = torch.randn(64, Z_DIM, 1, 1, device=device)
+            sample_fake = G(sample_z)
+        mv   = float(np.var(sample_fake.detach().cpu().numpy()))
+        mode_var_log.append(mv)
+
+        # IBFV — discriminator feature diversity
+        ibfv = compute_ibfv(D, sample_fake)
+        ibfv_log.append(ibfv)
+
         save_samples(G, epoch, out_dir)
         save_ckpt(G, D, opt_g, opt_d, epoch, g_losses, d_losses, out_dir)
-        best_saver.update(G, D, avg_g, epoch)
 
+        # FID every fid_every epochs
         fid = None
         if inception is not None and (epoch + 1) % fid_every == 0:
             fid = calc_fid(G, loader, inception)
             fid_scores[epoch + 1] = fid
 
-        mv      = float(np.var(fake.detach().cpu().numpy()))
+        best_saver.update(G, D, fid, epoch)
+
         fid_str = f" | FID: {fid:.4f}" if fid else ""
         print(f"  Epoch [{epoch+1:3d}/{epochs}] | "
-              f"G: {avg_g:7.4f} | D: {avg_d:7.4f} | "
-              f"ModeVar: {mv:.4f}{fid_str}")
+              f"G: {avg_g:8.4f} | D: {avg_d:8.4f} | "
+              f"ModeVar: {mv:.4f} | IBFV: {ibfv:.4f}{fid_str}")
 
     save_final(G, D, out_dir)
-    return G, g_losses, d_losses, fid_scores
+    return G, g_losses, d_losses, fid_scores, mode_var_log, ibfv_log
 
 
 # ──────────────────────────────────────────────────────────────────────────────
 # PLOTS
 # ──────────────────────────────────────────────────────────────────────────────
 
-def plot_results(g_losses, d_losses, fid_scores, out_dir):
-    fig, axes = plt.subplots(1, 2, figsize=(16, 6))
+def plot_results(g_losses, d_losses, fid_scores, mode_var_log, ibfv_log, out_dir):
+    fig, axes = plt.subplots(2, 2, figsize=(16, 12))
 
-    axes[0].plot(g_losses, label="G Loss", color="teal")
-    axes[0].plot(d_losses, label="D Loss", color="orange")
-    axes[0].set_title("Hybrid Loss — Generator & Discriminator (CIFAR-10)")
-    axes[0].set_xlabel("Epoch"); axes[0].set_ylabel("Loss")
-    axes[0].legend(); axes[0].grid(True)
+    # Loss curves
+    axes[0, 0].plot(g_losses, label="G Loss", color="teal")
+    axes[0, 0].plot(d_losses, label="D Loss", color="orange")
+    axes[0, 0].set_title("Hybrid Loss — Generator & Discriminator (EuroSAT)")
+    axes[0, 0].set_xlabel("Epoch"); axes[0, 0].set_ylabel("Loss")
+    axes[0, 0].legend(); axes[0, 0].grid(True)
 
+    # FID curve
     if fid_scores:
-        axes[1].plot(list(fid_scores.keys()), list(fid_scores.values()),
-                     marker='o', color="teal")
-        axes[1].set_title("FID Score — Hybrid Loss (Lower = Better)")
-        axes[1].set_xlabel("Epoch"); axes[1].set_ylabel("FID Score")
-        axes[1].grid(True)
+        axes[0, 1].plot(list(fid_scores.keys()), list(fid_scores.values()),
+                        marker='o', color="teal")
+        axes[0, 1].set_title("FID Score — Hybrid Loss (Lower = Better)")
+        axes[0, 1].set_xlabel("Epoch"); axes[0, 1].set_ylabel("FID Score")
+        axes[0, 1].grid(True)
     else:
-        axes[1].set_visible(False)
+        axes[0, 1].set_visible(False)
 
-    plt.suptitle("DCGAN CIFAR-10 — Hybrid Loss (100 Epochs)", fontsize=13)
+    # Mode Variance
+    axes[1, 0].plot(mode_var_log, color="purple")
+    axes[1, 0].set_title("Mode Variance (Pixel-Space)")
+    axes[1, 0].set_xlabel("Epoch"); axes[1, 0].set_ylabel("Variance")
+    axes[1, 0].grid(True)
+
+    # IBFV
+    axes[1, 1].plot(ibfv_log, color="green")
+    axes[1, 1].set_title("IBFV — Intra-Batch Feature Variance (Higher = More Diverse)")
+    axes[1, 1].set_xlabel("Epoch"); axes[1, 1].set_ylabel("IBFV")
+    axes[1, 1].grid(True)
+
+    plt.suptitle("DCGAN EuroSAT — Hybrid Loss (150 Epochs)", fontsize=13)
     plt.tight_layout()
     path = os.path.join(out_dir, "hybrid_loss_curves.png")
     plt.savefig(path, dpi=300); plt.close()
@@ -442,7 +561,7 @@ def plot_results(g_losses, d_losses, fid_scores, out_dir):
 # ──────────────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    out_dir = os.path.join(os.path.expanduser("~"), "project", "cifar10_hybrid")
+    out_dir = os.path.join(os.path.expanduser("~"), "project", "eurosat_hybrid")
     os.makedirs(out_dir, exist_ok=True)
     print(f"📁 Output : {out_dir}")
     print(f"📂 Dataset: {DATA_ROOT}")
@@ -451,11 +570,11 @@ if __name__ == "__main__":
     inception = InceptionFeatureExtractor().to(device).eval()
     print("✅ Inception loaded\n")
 
-    epochs    = 100
+    epochs    = 150          # paper uses 150 epochs for EuroSAT
     fid_every = 10
 
     print(f"{'#'*62}")
-    print(f"  DATASET      : CIFAR-10 (10 classes, 50k train images)")
+    print(f"  DATASET      : EuroSAT (10 classes, ~27k images)")
     print(f"  ARCHITECTURE : DCGAN (ngf={NGF}, ndf={NDF})")
     print(f"  LOSS         : HYBRID (WGAN-GP + L1 + VGG perceptual)")
     print(f"  IMAGE SIZE   : {IMG_SIZE}×{IMG_SIZE}")
@@ -464,7 +583,7 @@ if __name__ == "__main__":
     print(f"  DEVICE       : {device}")
     print(f"{'#'*62}")
 
-    G, g_losses, d_losses, fid_scores = train(
+    G, g_losses, d_losses, fid_scores, mv_log, ibfv_log = train(
         out_dir=out_dir,
         epochs=epochs,
         inception=inception,
@@ -475,21 +594,24 @@ if __name__ == "__main__":
     z = torch.randn(200, Z_DIM, 1, 1, device=device)
     with torch.no_grad():
         fake = G(z)
-    var       = float(np.var(fake.detach().cpu().numpy()))
-    final_fid = (list(fid_scores.values())[-1] if fid_scores else None)
+
+    final_fid  = list(fid_scores.values())[-1] if fid_scores else None
+    final_mv   = mv_log[-1]
+    final_ibfv = ibfv_log[-1]
 
     result = {
-        "Dataset"      : "CIFAR-10",
-        "Architecture" : "DCGAN",
-        "Optimizer"    : "Adam TTUR",
-        "Loss_Type"    : "hybrid",
-        "Image_Size"   : f"{IMG_SIZE}x{IMG_SIZE}",
-        "Batch_Size"   : BATCH_SIZE,
-        "Epochs"       : epochs,
-        "Final_G_Loss" : round(g_losses[-1], 4),
-        "Final_D_Loss" : round(d_losses[-1], 4),
-        "FID_Score"    : round(final_fid, 4) if final_fid else "N/A",
-        "ModeVariance" : round(var, 4),
+        "Dataset"       : "EuroSAT",
+        "Architecture"  : "DCGAN",
+        "Optimizer"     : "Adam TTUR",
+        "Loss_Type"     : "hybrid",
+        "Image_Size"    : f"{IMG_SIZE}x{IMG_SIZE}",
+        "Batch_Size"    : BATCH_SIZE,
+        "Epochs"        : epochs,
+        "Final_G_Loss"  : round(g_losses[-1], 4),
+        "Final_D_Loss"  : round(d_losses[-1], 4),
+        "FID_Score"     : round(final_fid, 4) if final_fid else "N/A",
+        "ModeVariance"  : round(final_mv, 4),
+        "IBFV"          : round(final_ibfv, 4),
     }
 
     df       = pd.DataFrame([result])
@@ -498,19 +620,19 @@ if __name__ == "__main__":
     print(f"\n✅ Results → {csv_path}")
     print("\n", df.to_string(index=False))
 
-    plot_results(g_losses, d_losses, fid_scores, out_dir)
+    plot_results(g_losses, d_losses, fid_scores, mv_log, ibfv_log, out_dir)
 
     print(f"\n{'#'*62}")
-    print("  🎉 CIFAR-10 HYBRID EXPERIMENT COMPLETE!")
+    print("  🎉 EuroSAT HYBRID EXPERIMENT COMPLETE!")
     print(f"  📁 Output: {out_dir}")
     print(f"{'#'*62}")
     print("""
   Files:
   ├── hybrid_results.csv
-  ├── hybrid_loss_curves.png
-  ├── samples/           ← generated grids every epoch
+  ├── hybrid_loss_curves.png        ← 4-panel plot (loss, FID, ModeVar, IBFV)
+  ├── samples/                      ← generated grids every epoch
   ├── models/
   │   ├── final/  hybrid_G.pth  hybrid_D.pth
-  │   └── best/   hybrid_G_best.pth  hybrid_D_best.pth
-  └── checkpoints/       ← saved every 10 epochs
+  │   └── best/   hybrid_G_best.pth  hybrid_D_best.pth  (saved by FID)
+  └── checkpoints/                  ← saved every 10 epochs
     """)
