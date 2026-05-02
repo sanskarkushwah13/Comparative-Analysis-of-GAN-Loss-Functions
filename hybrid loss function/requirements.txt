@@ -1,0 +1,25 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# requirements.txt
+# DCGAN Hybrid Loss — CIFAR-10 & EuroSAT
+# Python 3.9+
+# Install: pip install -r requirements.txt
+# ──────────────────────────────────────────────────────────────────────────────
+
+# Core Deep Learning
+torch>=2.0.0
+torchvision>=0.15.0
+torchaudio>=2.0.0          # optional, installs with torch bundle
+
+# Scientific Computing
+numpy>=1.24.0
+scipy>=1.10.0              # linalg.sqrtm for FID computation
+
+# Data & Plotting
+pandas>=2.0.0
+matplotlib>=3.7.0
+
+# Image Processing
+Pillow>=9.5.0              # PIL for EuroSAT custom dataset loader
+
+# Progress & Utilities
+tqdm>=4.65.0               # optional but useful for long runs
