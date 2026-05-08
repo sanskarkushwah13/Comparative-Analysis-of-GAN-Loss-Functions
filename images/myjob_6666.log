@@ -1,0 +1,75 @@
+no change     /apps/anaconda3/condabin/conda
+no change     /apps/anaconda3/bin/conda
+no change     /apps/anaconda3/bin/conda-env
+no change     /apps/anaconda3/bin/activate
+no change     /apps/anaconda3/bin/deactivate
+no change     /apps/anaconda3/etc/profile.d/conda.sh
+no change     /apps/anaconda3/etc/fish/conf.d/conda.fish
+no change     /apps/anaconda3/shell/condabin/Conda.psm1
+no change     /apps/anaconda3/shell/condabin/conda-hook.ps1
+no change     /apps/anaconda3/lib/python3.11/site-packages/xontrib/conda.xsh
+no change     /apps/anaconda3/etc/profile.d/conda.csh
+no change     /home/2024mcsecs014/.bashrc
+No action taken.
+/apps/anaconda3/lib/python3.11/site-packages/torch/utils/data/dataloader.py:627: UserWarning: This DataLoader will create 2 worker processes in total. Our suggested max number of worker in current system is 1, which is smaller than what this DataLoader is going to create. Please be aware that excessive worker creation might get DataLoader running slow or even freeze, lower the worker number to avoid potential slowness/freeze if necessary.
+  warnings.warn(
+Using device: cuda
+Output : /home/2024mcsecs014/project/chexpert_output
+Dataset: /home/2024mcsecs014/dataset/CheXpert-v1.0-small
+
+Loading Inception v3...
+Inception loaded
+
+##################################################################
+  Dataset      : CheXpert-v1.0-small (frontal views)
+  Architecture : DCGAN (ngf=64, ndf=64) + 14-class aux head
+  Uncertainty  : policy='ignore'
+  Metrics      : FID | IS | Precision | Recall | SSIM
+  Experiments  : ['standard', 'lsgan', 'wgan', 'wgangp', 'hinge', 'hybrid']
+  Epochs       : 300  |  Metric every: 10
+  Device       : cuda
+##################################################################
+
+******************************************************************
+  Experiment 1/6: STANDARD
+******************************************************************
+
+==================================================================
+  DCGAN + CheXpert | STANDARD | 300 Epochs
+  Uncertainty policy: ignore  |  Device: cuda
+==================================================================
+  CheXpert train: 191027 frontal images | uncertainty_policy='ignore'
+  G params: 3,576,704
+  D params: 2,772,750
+  Adam | lr=2e-4 | betas=(0.5, 0.999) | n_critic=1
+  Ep [  1/300] G: 3.3724 D: 0.7157 Var:0.3424
+  Ep [  2/300] G: 3.2143 D: 0.6090 Var:0.3266
+  Ep [  3/300] G: 3.4575 D: 0.5431 Var:0.3333
+  Ep [  4/300] G: 3.2337 D: 0.5427 Var:0.3088
+  Ep [  5/300] G: 3.5338 D: 0.5019 Var:0.2950
+  Ep [  6/300] G: 3.6929 D: 0.4871 Var:0.2972
+  Ep [  7/300] G: 3.9086 D: 0.4648 Var:0.2860
+  Ep [  8/300] G: 4.0480 D: 0.4578 Var:0.2942
+  Ep [  9/300] G: 4.2603 D: 0.4316 Var:0.2902
+  Checkpoint → epoch_010.pth
+    Computing metrics (FID / IS / P&R / SSIM)...
+    FID: 24.9017 | IS: 2.204±0.135 | Prec: 0.6790 | Rec: 0.4660 | SSIM: 0.5236±0.0703
+  Best model saved | epoch 10 | FID: 24.9017
+  Ep [ 10/300] G: 4.4891 D: 0.4210 Var:0.2738 | FID:24.90 IS:2.20 Prec:0.679 Rec:0.466 SSIM:0.524
+Traceback (most recent call last):
+  File "/home/2024mcsecs014/project/hybrid/cxpert_hy.py", line 1108, in <module>
+  File "/home/2024mcsecs014/project/hybrid/cxpert_hy.py", line 1028, in run_experiments
+  File "/home/2024mcsecs014/project/hybrid/cxpert_hy.py", line 812, in train
+  File "/apps/anaconda3/lib/python3.11/site-packages/torch/utils/data/dataloader.py", line 732, in __next__
+  File "/apps/anaconda3/lib/python3.11/site-packages/torch/utils/data/dataloader.py", line 1506, in _next_data
+  File "/apps/anaconda3/lib/python3.11/site-packages/torch/utils/data/dataloader.py", line 1541, in _process_data
+  File "/apps/anaconda3/lib/python3.11/site-packages/torch/_utils.py", line 769, in reraise
+FileNotFoundError: Caught FileNotFoundError in DataLoader worker process 0.
+Original Traceback (most recent call last):
+  File "/apps/anaconda3/lib/python3.11/site-packages/torch/utils/data/_utils/worker.py", line 349, in _worker_loop
+  File "/apps/anaconda3/lib/python3.11/site-packages/torch/utils/data/_utils/fetch.py", line 52, in fetch
+  File "/apps/anaconda3/lib/python3.11/site-packages/torch/utils/data/_utils/fetch.py", line 52, in <listcomp>
+  File "/home/2024mcsecs014/project/hybrid/cxpert_hy.py", line 146, in __getitem__
+  File "/apps/anaconda3/lib/python3.11/site-packages/PIL/Image.py", line 3247, in open
+FileNotFoundError: [Errno 2] No such file or directory: '/home/2024mcsecs014/dataset/CheXpert-v1.0-small/train/patient02359/study3/view1_frontal.jpg'
+

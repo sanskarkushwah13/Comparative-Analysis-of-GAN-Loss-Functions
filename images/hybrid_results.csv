@@ -1,0 +1,2 @@
+Dataset,Architecture,Optimizer,Loss_Type,Uncertainty_Policy,Epochs,Final_G_Loss,Final_D_Loss,FID_Score,ModeVariance
+CheXpert-v1.0-small,DCGAN,Adam,hybrid,ignore,100,980.8184,-1.2745,125.7346,0.1853

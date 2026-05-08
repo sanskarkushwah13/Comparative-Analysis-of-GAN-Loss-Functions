@@ -1,0 +1,6 @@
+Exp_No,Dataset,Architecture,Optimizer,Loss_Type,Epochs,Final_G_Loss,Final_D_Loss,FID_Score,ModeVariance
+1,EuroSAT_RGB,DCGAN,Adam,standard,150,6.6873,0.0593,40.898,0.0429
+2,EuroSAT_RGB,DCGAN,Adam,lsgan,150,0.4821,0.0471,39.9079,0.058
+3,EuroSAT_RGB,DCGAN,Adam,wgan,150,0.0103,-0.0907,102.881,0.1188
+4,EuroSAT_RGB,DCGAN,Adam,wgangp,150,583.4053,60.8907,95.5508,0.0786
+5,EuroSAT_RGB,DCGAN,Adam,hinge,150,4.4938,0.1319,48.8761,0.0671
