@@ -1,326 +1,43 @@
-# 🧠 Unified DCGAN Framework for Multi-Dataset Image Generation
+# Comparative Analysis of GAN Loss Functions
 
-## 📌 Overview
+IEEE Access paper: *A Comparative Analysis of GAN Loss Functions for 
+Cross-Domain Image Synthesis* — Kushwah & Shaikh, NIT Srinagar (2026)
 
-This repository provides a **comprehensive DCGAN-based framework** for training and evaluating Generative Adversarial Networks across **multiple datasets and domains**:
+## Results
 
-* 🏥 Medical Imaging → **CheXpert**
-* 🌍 Remote Sensing → **EuroSAT**
-* 🧪 Benchmark Dataset → **CIFAR-10**
+| Loss | CIFAR-10 FID↓ | EuroSAT FID↓ | CheXpert FID↓ |
+|---|---|---|---|
+| Standard GAN | 363.74 | 40.90 | — |
+| LSGAN | 161.46 | 39.91 | — |
+| WGAN | 102.89 | 102.88 | 58.84 |
+| WGAN-GP | 58.86 | 95.55 | — |
+| Hinge Loss | 185.02 | 48.88 | — |
+| **Hybrid (ours)** | **61.34** | **43.17** | **45.98** |
 
-The framework is designed for:
+## Quickstart
 
-* GAN research & experimentation
-* Loss function comparison
-* Multi-domain generalization
-* HPC-based large-scale training
-
----
-
-## 🚀 Key Features
-
-### 🧩 Multi-Dataset Support
-
-* CheXpert (Medical X-rays)
-* EuroSAT (Satellite images)
-* CIFAR-10 (Standard benchmark)
-
----
-
-### ⚙️ GAN Variants Implemented
-
-* Standard GAN
-* LSGAN
-* WGAN
-* WGAN-GP
-* Hinge Loss
-* Hybrid GAN (only CheXpert)
-
----
-
-### 🧠 Advanced Capabilities
-
-#### CheXpert (Medical AI)
-
-* Multi-label classification (14 diseases)
-* Uncertainty handling (`-1 labels`)
-* Auxiliary classifier GAN
-
-#### General Features
-
-* FID Score evaluation (InceptionV3)
-* Mode collapse detection (variance)
-* Automatic:
-
-  * Checkpointing
-  * Best model saving
-  * Sample generation
-  * CSV logging
-
----
-
-## 📂 Project Structure
-
-```id="proj123"
-project/
-│
-├── chexpert_dcgan.py
-├── cxpert_dcgan_hybrid.py
-├── test_eurosat.py
-├── test_cifar.py
-│
-├── dataset/
-│   ├── CheXpert-v1.0-small/
-│   ├── eurosat/
-│   └── cifar-10-batches-py_small/
-│
-└── output/
-    ├── samples/
-    ├── models/
-    ├── checkpoints/
-    └── results.csv
+```bash
+pip install -r requirements.txt
+python src/train.py --loss hybrid --dataset cifar10 --epochs 200
 ```
 
----
+## Datasets
+- CIFAR-10: auto-downloads via torchvision  
+- EuroSAT: [download link](https://madm.dfki.de/files/sentinel/EuroSAT.zip) → `data/EuroSAT/`  
+- CheXpert: [Stanford ML Group](https://stanfordmlgroup.github.io/competitions/chexpert/) → `data/CheXpert/`
 
-## 📊 Datasets
-
-### 1. 🏥 CheXpert (Medical)
-
-```id="c1"
-~/dataset/CheXpert-v1.0-small/
+## Reproduce all results
+```bash
+bash experiments/cifar10/run_all.sh
+bash experiments/eurosat/run_all.sh
 ```
 
-* 224K chest X-rays
-* 14 pathology labels
-* Multi-label classification
-
----
-
-### 2. 🌍 EuroSAT (Satellite)
-
-```id="c2"
-~/dataset/eurosat/EuroSAT_RGB/
+## Citation
+```bibtex
+@article{kushwah2026gan,
+  title={A Comparative Analysis of GAN Loss Functions...},
+  author={ Sanskar and Shaikh, Tawseef Ayoub},
+  journal={IEEE Access},
+  year={2026}
+}
 ```
-
-* Land-use classification dataset
-* RGB satellite images
-
----
-
-### 3. 🧪 CIFAR-10
-
-```id="c3"
-~/dataset/cifar-10-batches-py_small/
-```
-
-* 60,000 images
-* 10 classes
-
----
-
-## 📥 Dataset Setup (HPC)
-
-### CheXpert
-
-```bash id="d1"
-kaggle datasets download -d ashery/chexpert
-unzip chexpert.zip
-```
-
-### EuroSAT
-
-```bash id="d2"
-scp -r EuroSAT_RGB user@hpc:~/dataset/eurosat/
-```
-
-### CIFAR-10
-
-```bash id="d3"
-wget https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz
-```
-
----
-
-## ⚙️ Installation
-
-```bash id="inst1"
-pip install torch torchvision numpy pandas matplotlib pillow scipy
-```
-
----
-
-## 🏃 Training
-
-### ▶ CheXpert (Full Research Model)
-
-```bash id="run1"
-python chexpert_dcgan.py
-```
-
-### ▶ EuroSAT
-
-```bash id="run2"
-python test_e_1.py
-```
-
-### ▶ CIFAR-10
-
-```bash id="run3"
-python test_c1.py
-```
-
----
-
-## ⚡ Training Configuration
-
-| Parameter     | Value      |
-| ------------- | ---------- |
-| Image Size    | 64×64      |
-| Latent Vector | 100        |
-| Batch Size    | 32 / 64    |
-| Optimizer     | Adam       |
-| Device        | GPU (CUDA) |
-
----
-
-## 📈 Evaluation Metrics
-
-### 🔹 FID Score
-
-Measures similarity between real and generated images.
-
-### 🔹 Mode Variance
-
-Detects mode collapse.
-
-### 🔹 Loss Curves
-
-* Generator Loss
-* Discriminator Loss
-
----
-
-## 🧠 Architecture
-
-### Generator
-
-* Input: Noise (z ∈ R¹⁰⁰)
-* Output: 64×64 RGB image
-
-### Discriminator
-
-* CNN-based
-* Outputs:
-
-  * Real/Fake score
-  * (CheXpert only) Multi-label classification
-
----
-
-## 🧪 Experiments
-
-### CheXpert
-
-* 6 GAN variants
-* Medical classification + generation
-
-### EuroSAT & CIFAR
-
-* 5 GAN variants
-* Pure image generation
-
----
-
-## 📁 Outputs
-
-```id="out1"
-output/
-├── samples/
-├── models/
-│   ├── final/
-│   └── best/
-├── checkpoints/
-├── *_results.csv
-├── *_loss_curves.png
-└── *_fid_scores.png
-```
-
----
-## 📊 Results
-
-| Loss Function | FID ↓ | IS ↑ | Precision | Recall |
-|--------------|------|------|----------|--------|
-| GAN (BCE) | 38.80 | 5.21 | 0.22 | 0.31 |
-| WGAN-GP | 18.12 | 8.01 | 0.45 | 0.52 |
-| Hinge | 19.50 | 7.80 | 0.42 | 0.50 |
-| **Hybrid (Ours)** | **17.38** | **8.72** | **0.48** | **0.55** |
-
-# 🚀 Comparative Analysis of GAN Loss Functions
-
-This project presents a **systematic and controlled evaluation of GAN loss functions**
-using a unified DCGAN architecture across multiple datasets.
-
----
-
-## 🔬 Key Contributions
-
-- Fair comparison of GAN losses (BCE, LSGAN, WGAN, WGAN-GP, Hinge)
-- Hybrid loss formulation (WGAN + Hinge)
-- Cross-domain evaluation (CIFAR-10, EuroSAT)
-- Metrics: FID, IS, Precision, Recall, SSIM
-
-## ⚠️ Important Notes
-
-* All images resized to **64×64**
-* CheXpert:
-
-  * Uses **frontal images only**
-  * Converts grayscale → RGB
-* WGAN requires:
-
-  * Weight clipping OR gradient penalty
-
----
-
-## 🔧 Customization
-
-Modify parameters inside code:
-
-```python id="conf1"
-IMG_SIZE = 64
-Z_DIM = 100
-BATCH_SIZE = 32
-```
-
----
-
-## 📌 Future Work
-
-* Conditional GAN (cGAN)
-* StyleGAN / Diffusion models
-* Multi-modal medical datasets
-* Higher resolution synthesis
-
----
-
-## 👨‍💻 Author
-
-Sanskar Kushwah
-M.Tech Computer Science
-NIT Srinagar
-
----
-
-## 📜 License
-
-Academic & research use only.
-
----
-
-## ⭐ Support
-
-If this helps your research:
-
-* Star ⭐ the repo
-* Cite in your paper
