@@ -25,6 +25,7 @@ python src/train.py --loss hybrid --dataset cifar10 --epochs 200
 - CIFAR-10: auto-downloads via torchvision  
 - EuroSAT: [download link](https://madm.dfki.de/files/sentinel/EuroSAT.zip) → `data/EuroSAT/`  
 - CheXpert: [Stanford ML Group](https://stanfordmlgroup.github.io/competitions/chexpert/) → `data/CheXpert/`
+kaggle link : https://www.kaggle.com/code/sanskarkushwah13/cxpertdataset/edit 
 
 ## Reproduce all results
 ```bash
