@@ -1,6 +1,83 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 
+
+import pandas as pd
+import numpy as np
+
+# Load CSV
+df = pd.read_csv("cifer_all_6.csv")   # change filename
+
+# Forward fill FID values
+df["FID"] = df["FID"].fillna(method="ffill")
+
+# -------------------------------
+# Statistical Summary
+# -------------------------------
+
+results = []
+
+for exp in df["Experiment"].unique():
+
+    temp = df[df["Experiment"] == exp]
+
+    best_fid = temp["FID"].min()
+    final_fid = temp["FID"].iloc[-1]
+    avg_fid = temp["FID"].mean()
+
+    avg_g = temp["G_Loss"].mean()
+    avg_d = temp["D_Loss"].mean()
+
+    avg_mode = temp["ModeVar"].mean()
+
+    results.append([
+        exp,
+        best_fid,
+        final_fid,
+        avg_fid,
+        avg_g,
+        avg_d,
+        avg_mode
+    ])
+
+stats_df = pd.DataFrame(
+    results,
+    columns=[
+        "Loss Function",
+        "Best FID",
+        "Final FID",
+        "Average FID",
+        "Avg G Loss",
+        "Avg D Loss",
+        "Avg ModeVar"
+    ]
+)
+
+# --------------------------------
+# Automatic Ranking
+# --------------------------------
+
+stats_df["Rank"] = stats_df["Best FID"].rank(
+    ascending=True,
+    method="dense"
+)
+
+stats_df = stats_df.sort_values("Rank")
+
+print("\n==============================")
+print(" LOSS FUNCTION RANKING")
+print("==============================\n")
+
+print(stats_df)
+
+# Save CSV
+stats_df.to_csv(
+    "loss_function_ranking.csv",
+    index=False
+)
+
+print("\nSaved: loss_function_ranking.csv")
+
 CSV_FILE = "cifer_all_6.csv"  # change as needed
 
 df = pd.read_csv(CSV_FILE)
