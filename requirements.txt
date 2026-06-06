@@ -1,0 +1,21 @@
+# Comparative Analysis of GAN Loss Functions
+# Python 3.9+  |  pip install -r requirements.txt
+
+# Core Deep Learning
+torch>=2.0.0
+torchvision>=0.15.0
+
+# Scientific Computing
+numpy>=1.24.0
+scipy>=1.10.0
+
+# Data & Plotting
+pandas>=2.0.0
+matplotlib>=3.7.0
+
+# Image Processing
+Pillow>=9.5.0
+scikit-image>=0.21.0
+
+# Progress
+tqdm>=4.65.0
