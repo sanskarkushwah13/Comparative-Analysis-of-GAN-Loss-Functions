@@ -9,7 +9,7 @@ LOSSES=(standard lsgan wgan wgangp hinge hybrid)
 
 for loss in "${LOSSES[@]}"; do
   echo "=== EuroSAT | ${loss} ==="
-  python src/train.py --loss "$loss" --dataset eurosat --epochs 150 --seed 42
+  python src/train.py --loss "$loss" --dataset eurosat --epochs 150 --seeds 42
 done
 
 echo "All EuroSAT experiments complete. Results in ./runs/"

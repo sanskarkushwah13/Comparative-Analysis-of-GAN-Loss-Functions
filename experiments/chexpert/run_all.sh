@@ -9,7 +9,7 @@ LOSSES=(standard lsgan wgan wgangp hinge hybrid)
 
 for loss in "${LOSSES[@]}"; do
   echo "=== CheXpert | ${loss} ==="
-  python src/train.py --loss "$loss" --dataset chexpert --epochs 300 --seed 42
+  python src/train.py --loss "$loss" --dataset chexpert --epochs 300 --seeds 42
 done
 
 echo "All CheXpert experiments complete. Results in ./runs/"
