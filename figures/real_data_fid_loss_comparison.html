@@ -1,0 +1,169 @@
+
+<h2 class="sr-only">GAN loss function comparison — FID curves, loss dynamics, mode variance, and cross-dataset ranking from real training data</h2>
+
+<div style="display:flex;flex-direction:column;gap:32px;padding:1rem 0">
+
+<div>
+<p style="font-size:12px;font-weight:500;color:var(--color-text-secondary);margin:0 0 8px;letter-spacing:.05em;text-transform:uppercase">Fig 1 — FID over epochs · CIFAR-10 (100 epochs, real data)</p>
+<div style="position:relative;width:100%;height:280px">
+<canvas id="c1" role="img" aria-label="Line chart of FID score over training epochs for 6 GAN loss functions on CIFAR-10. LSGAN achieves lowest final FID of 42.2. Standard GAN diverges after epoch 20 to over 430.">FID curves for Standard GAN, LSGAN, WGAN, WGANGP, HINGE, HYBRID over 100 epochs on CIFAR-10.</canvas>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:8px;font-size:11px;color:var(--color-text-secondary)">
+<span style="display:flex;align-items:center;gap:4px"><span style="width:18px;height:3px;background:#E24B4A;display:inline-block"></span>Standard GAN</span>
+<span style="display:flex;align-items:center;gap:4px"><span style="width:18px;height:3px;background:#EF9F27;display:inline-block"></span>LSGAN</span>
+<span style="display:flex;align-items:center;gap:4px"><span style="width:18px;height:3px;background:#378ADD;display:inline-block"></span>WGAN</span>
+<span style="display:flex;align-items:center;gap:4px"><span style="width:18px;height:3px;background:#1D9E75;display:inline-block"></span>WGAN-GP</span>
+<span style="display:flex;align-items:center;gap:4px"><span style="width:18px;height:3px;background:#7F77DD;display:inline-block"></span>Hinge</span>
+<span style="display:flex;align-items:center;gap:4px"><span style="width:18px;height:3px;background:#D85A30;display:inline-block;border-bottom:2px dashed #D85A30;height:0"></span>Hybrid</span>
+</div>
+</div>
+
+<div>
+<p style="font-size:12px;font-weight:500;color:var(--color-text-secondary);margin:0 0 8px;letter-spacing:.05em;text-transform:uppercase">Fig 2 — Best FID · all datasets (real data)</p>
+<div style="position:relative;width:100%;height:260px">
+<canvas id="c2" role="img" aria-label="Grouped bar chart comparing best FID score for each loss function across CIFAR-10, EuroSAT, and CheXpert datasets. Lower is better.">Best FID grouped bar chart across three datasets.</canvas>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:8px;font-size:11px;color:var(--color-text-secondary)">
+<span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:#2C2C2A;display:inline-block"></span>CIFAR-10</span>
+<span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:#888780;display:inline-block"></span>EuroSAT</span>
+<span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:#B4B2A9;display:inline-block"></span>CheXpert (Hybrid only)</span>
+</div>
+</div>
+
+<div>
+<p style="font-size:12px;font-weight:500;color:var(--color-text-secondary);margin:0 0 8px;letter-spacing:.05em;text-transform:uppercase">Fig 3 — Mode variance (diversity) · CIFAR-10 vs EuroSAT</p>
+<div style="position:relative;width:100%;height:240px">
+<canvas id="c3" role="img" aria-label="Bar chart comparing mode variance for each loss function on CIFAR-10 and EuroSAT. Higher means more diverse generated images.">Mode variance comparison bar chart.</canvas>
+</div>
+</div>
+
+<div>
+<p style="font-size:12px;font-weight:500;color:var(--color-text-secondary);margin:0 0 8px;letter-spacing:.05em;text-transform:uppercase">Fig 4 — FID vs mode variance · quality–diversity trade-off (CIFAR-10)</p>
+<div style="position:relative;width:100%;height:280px">
+<canvas id="c4" role="img" aria-label="Scatter plot comparing best FID score on x-axis vs mode variance on y-axis for 6 GAN models on CIFAR-10. Ideal region is bottom-right (low FID, high diversity).">FID vs Mode Variance scatter plot for CIFAR-10.</canvas>
+</div>
+</div>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const MODELS = ['Standard GAN','LSGAN','WGAN','WGAN-GP','Hinge','Hybrid'];
+const COL = ['#E24B4A','#EF9F27','#378ADD','#1D9E75','#7F77DD','#D85A30'];
+
+const epochs = [10,20,30,40,50,60,70,80,90,100];
+
+const fidData = {
+  'Standard GAN': [86.80, 56.86, 404.88, 430.76, 432.64, 434.06, 435.49, 435.44, 432.27, 432.53],
+  'LSGAN':        [108.73, 81.31, 77.41, 64.74, 61.48, 79.60, 54.69, 50.61, 46.16, 42.20],
+  'WGAN':         [116.56, 126.75, 137.22, 146.50, 153.48, 94.83, 112.47, 109.88, 82.12, 96.30],
+  'WGAN-GP':      [149.50, 99.53, 78.02, 67.42, 63.63, 62.02, 55.23, 53.98, 53.94, 50.24],
+  'Hinge':        [79.97, 67.71, 82.48, 63.14, 53.81, 51.78, 426.47, 104.55, 76.33, 237.56],
+  'Hybrid':       [152.23, 163.50, 155.65, 125.60, 116.30, 120.57, 118.73, 125.79, 110.96, 113.96],
+};
+
+const dashes = [[],[],[],[],[6,3],[4,4]];
+
+new Chart(document.getElementById('c1'), {
+  type: 'line',
+  data: {
+    labels: epochs,
+    datasets: MODELS.map((m,i) => ({
+      label: m,
+      data: fidData[m],
+      borderColor: COL[i],
+      backgroundColor: 'transparent',
+      borderWidth: m === 'Hybrid' ? 2.5 : 1.8,
+      borderDash: dashes[i],
+      pointRadius: 3,
+      pointBackgroundColor: COL[i],
+      tension: 0.35,
+    }))
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { title: { display: true, text: 'Epoch', font: { size: 11 }, color: '#888780' }, ticks: { color: '#888780', font: { size: 10 } }, grid: { color: 'rgba(136,135,128,0.12)' } },
+      y: { title: { display: true, text: 'FID score (↓ lower = better)', font: { size: 11 }, color: '#888780' }, ticks: { color: '#888780', font: { size: 10 } }, grid: { color: 'rgba(136,135,128,0.12)' } }
+    }
+  }
+});
+
+const bestFID_cifar  = [56.86, 42.20, 82.12, 50.24, 51.78, 110.96];
+const bestFID_euro   = [40.90, 39.75, 81.18, 94.97, 43.55, 90.79];
+const bestFID_chex   = [null, null, null, null, null, 45.98];
+
+const x6 = MODELS;
+new Chart(document.getElementById('c2'), {
+  type: 'bar',
+  data: {
+    labels: x6,
+    datasets: [
+      { label:'CIFAR-10', data: bestFID_cifar, backgroundColor: '#2C2C2A', borderRadius:3, borderSkipped:false },
+      { label:'EuroSAT',  data: bestFID_euro,  backgroundColor: '#888780', borderRadius:3, borderSkipped:false },
+      { label:'CheXpert', data: bestFID_chex,  backgroundColor: '#B4B2A9', borderRadius:3, borderSkipped:false },
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false },
+      tooltip: { callbacks: { label: ctx => ctx.raw != null ? `${ctx.dataset.label}: ${ctx.raw.toFixed(2)}` : 'N/A' } }
+    },
+    scales: {
+      x: { ticks: { color:'#888780', font:{size:10} }, grid:{display:false} },
+      y: { title:{display:true,text:'Best FID (↓ lower = better)',font:{size:11},color:'#888780'}, ticks:{color:'#888780',font:{size:10}}, grid:{color:'rgba(136,135,128,0.12)'} }
+    }
+  }
+});
+
+const modeVar_cifar = [0.0341, 0.1698, 0.2711, 0.2067, 0.0364, 0.1180];
+const modeVar_euro  = [0.0571, 0.0733, 0.1129, 0.0748, 0.0699, 0.0587];
+
+new Chart(document.getElementById('c3'), {
+  type: 'bar',
+  data: {
+    labels: x6,
+    datasets: [
+      { label:'CIFAR-10', data: modeVar_cifar, backgroundColor: COL, borderRadius:3, borderSkipped:false },
+      { label:'EuroSAT',  data: modeVar_euro,  backgroundColor: COL.map(c=>c+'88'), borderRadius:3, borderSkipped:false, borderColor: COL, borderWidth:1 },
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { ticks:{color:'#888780',font:{size:10}}, grid:{display:false} },
+      y: { title:{display:true,text:'Mode variance (↑ higher = more diverse)',font:{size:11},color:'#888780'}, ticks:{color:'#888780',font:{size:10}}, grid:{color:'rgba(136,135,128,0.12)'} }
+    }
+  }
+});
+
+new Chart(document.getElementById('c4'), {
+  type: 'scatter',
+  data: {
+    datasets: MODELS.map((m,i) => ({
+      label: m,
+      data: [{ x: bestFID_cifar[i], y: modeVar_cifar[i] }],
+      backgroundColor: COL[i],
+      borderColor: '#fff',
+      borderWidth: 1.5,
+      pointRadius: m === 'Hybrid' ? 10 : 7,
+      pointStyle: m === 'Hybrid' ? 'star' : 'circle',
+    }))
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      legend: { display: true, position: 'right', labels: { font:{size:11}, color:'#888780', boxWidth:10, padding:8 } },
+      tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: FID ${ctx.parsed.x.toFixed(2)}, MVar ${ctx.parsed.y.toFixed(4)}` } }
+    },
+    scales: {
+      x: { title:{display:true,text:'Best FID (← lower = better)',font:{size:11},color:'#888780'}, ticks:{color:'#888780',font:{size:10}}, grid:{color:'rgba(136,135,128,0.12)'},
+           min: 30, max: 125 },
+      y: { title:{display:true,text:'Mode variance (↑ higher = more diverse)',font:{size:11},color:'#888780'}, ticks:{color:'#888780',font:{size:10}}, grid:{color:'rgba(136,135,128,0.12)'},
+           min: 0, max: 0.32 }
+    }
+  }
+});
+</script>
