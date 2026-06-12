@@ -217,8 +217,6 @@ class InceptionFeatureExtractor(nn.Module):
             nn.AdaptiveAvgPool2d((1, 1))
         )
 
-
-
     def forward(self, x):
         x = nn.functional.interpolate(x, size=(299, 299),
                                        mode='bilinear', align_corners=False)
