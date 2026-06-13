@@ -443,6 +443,7 @@ def train(loss_type, out_dir, epochs=30, inception=None, fid_every=10):
     return G, g_losses, d_losses, fid_scores
 
 
+
 # =========================
 # PLOTS
 # =========================
