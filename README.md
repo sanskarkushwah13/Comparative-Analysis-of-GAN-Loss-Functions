@@ -18,7 +18,7 @@ Cross-Domain Image Synthesis* — Kushwah & Shaikh, NIT Srinagar (2026)
 
 ```bash
 pip install -r requirements.txt
-python src/train.py --loss hybrid --dataset cifar10 --epochs 200
+python src/train.py --loss hybrid --dataset cifar10 --epochs 
 ```
 
 ## Datasets
