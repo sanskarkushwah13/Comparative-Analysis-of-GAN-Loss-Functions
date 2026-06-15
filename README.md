@@ -38,7 +38,7 @@ bash experiments/eurosat/run_all.sh
 
 ## Citation
 ```bibtex
-@article{kushwah2026gan,
+@article{sanskarkushwah,
   title={A Comparative Analysis of GAN Loss Functions...},
   author={ Sanskar and Shaikh, Tawseef Ayoub},
   journal={IEEE Access},
