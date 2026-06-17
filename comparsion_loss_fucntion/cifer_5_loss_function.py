@@ -15,7 +15,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
 # ✅ HPC CIFAR-10 path
-DATA_ROOT = os.path.expanduser("~/dataset/cifar-10-batches-py_small")
+DATA_ROOT = os.path.expanduser("~/dataset/cifar-10-batches-py_small") #root dir
 
 
 # =========================
