@@ -33,7 +33,7 @@ bash experiments/cifar10/run_all.sh
 bash experiments/eurosat/run_all.sh
 ```
 
-i  hate
+
 
 
 
