@@ -60,7 +60,7 @@ bash experiments/chexpert/run_all.sh
 ## Citation
 
 ```bibtex
-@article{kushwah2026gan,
+@article{sanskarkushwah,
   title   = {A Comparative Analysis of GAN Loss Functions for Cross-Domain Image Synthesis},
   author  = {Kushwah, Sanskar and Shaikh, Tawseef Ayoub},
   journal = {IEEE Access},
