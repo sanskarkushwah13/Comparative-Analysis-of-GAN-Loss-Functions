@@ -52,7 +52,7 @@ python src/train.py --loss hybrid --dataset cifar10 --epochs 100
 ## Reproduce All Results
 
 
-jikji
+
 ```bash
 bash experiments/cifar10/run_all.sh
 bash experiments/eurosat/run_all.sh
